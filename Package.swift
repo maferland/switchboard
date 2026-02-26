@@ -1,0 +1,35 @@
+// swift-tools-version: 5.9
+
+import PackageDescription
+
+let package = Package(
+    name: "Switchboard",
+    platforms: [.macOS(.v14)],
+    targets: [
+        .executableTarget(
+            name: "Switchboard",
+            path: "Sources/Switchboard",
+            linkerSettings: [
+                .linkedFramework("AppKit"),
+                .linkedFramework("CoreAudio"),
+                .linkedFramework("IOKit"),
+                .linkedFramework("AVFoundation"),
+                .linkedFramework("SystemExtensions"),
+                .linkedFramework("CoreMediaIO"),
+            ]
+        ),
+        .target(
+            name: "SwitchboardCamera",
+            path: "Sources/SwitchboardCamera",
+            linkerSettings: [
+                .linkedFramework("CoreMediaIO"),
+                .linkedFramework("AVFoundation"),
+            ]
+        ),
+        .testTarget(
+            name: "SwitchboardTests",
+            dependencies: ["Switchboard"],
+            path: "Tests/SwitchboardTests"
+        ),
+    ]
+)

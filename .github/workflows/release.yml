@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  release:
+    runs-on: macos-14
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Release
+        run: swift build -c release
+
+      - name: Test
+        run: swift test
+
+      - name: Package
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          mkdir -p dist
+          cp .build/release/Switchboard dist/
+          cd dist && zip "Switchboard-${VERSION}-macos-arm64.zip" Switchboard
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --generate-notes \
+            dist/Switchboard-${VERSION}-macos-arm64.zip
+
+      - name: Update Homebrew Tap
+        env:
+          GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+        run: |
+          if [ -f scripts/update_homebrew_tap.sh ]; then
+            ./scripts/update_homebrew_tap.sh "$GITHUB_REF_NAME" "dist/Switchboard-${GITHUB_REF_NAME}-macos-arm64.zip"
+          fi
