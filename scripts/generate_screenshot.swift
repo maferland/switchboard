@@ -179,7 +179,7 @@ struct MockPopover: View {
 
 // MARK: - Capture
 
-let scale: CGFloat = 2
+let scale: CGFloat = 3
 let padding: CGFloat = 24  // space for shadow
 let popover = MockPopover(version: version)
 let wrapper = popover.padding(padding)
