@@ -9,7 +9,7 @@
 ---
 
 <p align="center">
-  <img src="assets/popover.png" width="400" alt="Switchboard menu bar popover showing device priorities">
+  <img src="assets/popover.png?v=1.0.1" width="400" alt="Switchboard menu bar popover showing device priorities">
 </p>
 
 Switchboard is a menu bar app that monitors your lid state and connected peripherals — then picks the right mic, camera, and audio output so you don't have to.
