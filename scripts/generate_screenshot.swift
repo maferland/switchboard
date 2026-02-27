@@ -157,7 +157,7 @@ struct MockPopover: View {
 
 // MARK: - Capture
 
-let scale: CGFloat = 3
+let scale: CGFloat = 6
 let view = MockPopover()
 let hosting = NSHostingView(rootView: view)
 
