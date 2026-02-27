@@ -45,11 +45,15 @@ final class AudioDeviceManager {
     }
 
     func inputDevices() -> [AudioDevice] {
-        allDevices().filter(\.hasInput)
+        physicalDevices().filter(\.hasInput)
     }
 
     func outputDevices() -> [AudioDevice] {
-        allDevices().filter(\.hasOutput)
+        physicalDevices().filter(\.hasOutput)
+    }
+
+    func physicalDevices() -> [AudioDevice] {
+        allDevices().filter { $0.transport != .virtual && $0.transport != .aggregate }
     }
 
     // MARK: - Default Device

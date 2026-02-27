@@ -1,12 +1,15 @@
-import AppKit
+import SwiftUI
 
 @main
-struct SwitchboardApp {
-    static func main() {
-        let app = NSApplication.shared
-        let delegate = AppDelegate()
-        app.delegate = delegate
-        app.setActivationPolicy(.accessory)
-        app.run()
+struct SwitchboardApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
+    var body: some Scene {
+        MenuBarExtra {
+            MainView(state: appDelegate.windowState)
+        } label: {
+            Image(systemName: "arrow.triangle.swap")
+        }
+        .menuBarExtraStyle(.window)
     }
 }

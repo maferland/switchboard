@@ -78,9 +78,12 @@ struct RuleEngineTests {
 
     // MARK: - Clamshell Mode
 
-    @Test("Clamshell + StreamCam → StreamCam mic + cam")
-    func clamshellWithStreamCam() {
-        let engine = RuleEngine(config: defaultConfig)
+    @Test("Clamshell + priority config → first available device")
+    func clamshellWithConfig() {
+        var config = SwitchboardConfig()
+        config.clamshellMic = ["Logi StreamCam"]
+        config.clamshellCamera = ["Logi StreamCam"]
+        let engine = RuleEngine(config: config)
         let state = makeState(
             clamshell: .closed,
             audio: [Self.builtInMic, Self.builtInSpeaker, Self.streamCamAudio],
@@ -94,7 +97,22 @@ struct RuleEngineTests {
         #expect(selection.reason == "Clamshell Mode")
     }
 
-    @Test("Clamshell, no StreamCam → built-in mic + external cam")
+    @Test("Priority list skips unavailable, picks next")
+    func priorityFallthrough() {
+        var config = SwitchboardConfig()
+        config.clamshellMic = ["Missing Device", "Logi StreamCam"]
+        let engine = RuleEngine(config: config)
+        let state = makeState(
+            clamshell: .closed,
+            audio: [Self.builtInMic, Self.streamCamAudio]
+        )
+
+        let selection = engine.evaluate(state: state)
+
+        #expect(selection.preferredMic?.name == "Logi StreamCam")
+    }
+
+    @Test("Clamshell, no config → built-in mic + external cam")
     func clamshellNoStreamCam() {
         let externalCam = VideoDevice(
             id: "ext-cam", name: "USB Webcam",
@@ -113,10 +131,10 @@ struct RuleEngineTests {
         #expect(selection.preferredCamera?.name == "USB Webcam")
     }
 
-    // MARK: - Blocked Devices
+    // MARK: - Fallbacks
 
-    @Test("AirPods mic is blocked")
-    func airpodsMicBlocked() {
+    @Test("No config → fallback built-in mic")
+    func fallbackBuiltInMic() {
         let engine = RuleEngine(config: defaultConfig)
         let state = makeState(
             clamshell: .open,
@@ -126,11 +144,10 @@ struct RuleEngineTests {
         let selection = engine.evaluate(state: state)
 
         #expect(selection.preferredMic?.name == "MacBook Pro Microphone")
-        #expect(selection.preferredMic?.name != "AirPods Pro")
     }
 
-    @Test("Laptop speakers blocked by default")
-    func laptopSpeakersBlocked() {
+    @Test("Output fallback prefers external over built-in")
+    func outputFallbackPrefersExternal() {
         let engine = RuleEngine(config: defaultConfig)
         let state = makeState(
             clamshell: .open,

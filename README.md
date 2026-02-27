@@ -1,29 +1,30 @@
 <div align="center">
-<h1>🎛 Switchboard</h1>
+<h1>🎛️ Switchboard</h1>
+
+<img src="assets/icon.png" width="128" height="128" alt="Switchboard Icon">
 
 <p>Auto-switch audio and video devices when you dock your Mac</p>
 </div>
 
 ---
 
-Switchboard is a menu bar daemon that monitors your lid state, display configuration, and connected peripherals — then picks the right mic, camera, and audio output so you don't have to.
+<p align="center">
+  <img src="assets/popover.png" width="400" alt="Switchboard menu bar popover showing device priorities">
+</p>
 
-## Prerequisites
-
-- macOS 14+ (Sonoma)
-- Xcode Command Line Tools
+Switchboard is a menu bar app that monitors your lid state and connected peripherals — then picks the right mic, camera, and audio output so you don't have to.
 
 ## Install
 
-### Homebrew
-
-```sh
-brew tap maferland/tap && brew install --cask switchboard
+**Homebrew** (recommended):
+```bash
+brew install --cask maferland/tap/switchboard
 ```
 
-### Build from source
+**Manual**: Download DMG from [Releases](https://github.com/maferland/switchboard/releases), open it, drag `Switchboard.app` to Applications.
 
-```sh
+**Build from source**:
+```bash
 git clone https://github.com/maferland/switchboard.git
 cd switchboard
 make install
@@ -31,24 +32,26 @@ make install
 
 ## Usage
 
-Switchboard runs as a menu bar icon. Click it to see current mode (Laptop / Clamshell), active devices, and preferences.
+Run `Switchboard`. A swap icon appears in your menu bar showing the current mode.
 
-On first launch, it detects connected devices and suggests rules. Customize anytime via Preferences.
-
-### Device Rules
-
-| Condition | Camera | Mic | Output |
-|-----------|--------|-----|--------|
-| Clamshell + StreamCam | StreamCam | StreamCam mic | Headphones > external |
-| Clamshell, no StreamCam | External cam | Built-in mic | Headphones > external |
-| Laptop open | Built-in | Built-in | Headphones > external |
-| **Always blocked** | — | Headphone/AirPods mic | Laptop speakers* |
-
-\* Unless overridden in preferences.
+- **Click** — Popover with current mode (Laptop / Clamshell), active devices, and settings
+- **Priority lists** — Each mode has a priority list per category (mic, output, camera). First available wins, falls back to built-in.
+- **Drag to reorder** — Customize priorities in Settings
+- **Start at Login** — Run automatically when you log in
+- **Quit** — ⌘Q
 
 ### Config
 
-Stored at `~/.config/switchboard/config.json`. Editable by hand or via Preferences.
+Stored at `~/.config/switchboard/config.json`.
+
+```json
+{
+  "laptopMic": ["MacBook Pro Microphone"],
+  "laptopOutput": ["CalDigit TS4 Audio - Rear", "MacBook Pro Speakers"],
+  "clamshellMic": ["Elgato Wave:3"],
+  "clamshellOutput": ["CalDigit TS4 Audio - Rear"]
+}
+```
 
 ## Privacy
 
@@ -56,15 +59,16 @@ No analytics, no tracking, no network requests. All data stays on device.
 
 ## Requirements
 
-- macOS 14+ (Sonoma)
+- macOS 14 (Sonoma) or later
 - Microphone permission (monitors devices, doesn't record)
-- Camera permission (virtual camera proxy)
-- System Extension approval (for virtual camera)
+- Camera permission (detects cameras)
 
 ## Support
 
-<a href="https://www.buymeacoffee.com/maferland" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="48"></a>
+If Switchboard saves you from fiddling with Sound settings, consider buying me a coffee:
+
+[![Buy Me A Coffee](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-support-yellow?style=for-the-badge&logo=buy-me-a-coffee)](https://buymeacoffee.com/maferland)
 
 ## License
 
-[MIT](LICENSE)
+MIT — see [LICENSE](LICENSE)

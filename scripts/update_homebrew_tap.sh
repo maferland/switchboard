@@ -1,41 +1,54 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -euo pipefail
 
-VERSION="${1:?Usage: $0 <version> <artifact-path>}"
-ARTIFACT="${2:?Usage: $0 <version> <artifact-path>}"
-TAP_REPO="maferland/homebrew-tap"
+VERSION="${1:?Usage: update_homebrew_tap.sh VERSION DMG_PATH}"
+DMG_PATH="${2:?Usage: update_homebrew_tap.sh VERSION DMG_PATH}"
 
-SHA256=$(shasum -a 256 "$ARTIFACT" | awk '{print $1}')
-URL="https://github.com/maferland/switchboard/releases/download/${VERSION}/$(basename "$ARTIFACT")"
+if [ ! -f "$DMG_PATH" ]; then
+    echo "Error: DMG not found at $DMG_PATH"
+    exit 1
+fi
 
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
+SHA=$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')
+CASK_VERSION="${VERSION#v}"
 
-git clone "https://x-access-token:${GH_TOKEN}@github.com/${TAP_REPO}.git" "$TMPDIR/tap"
+echo "Updating homebrew tap: version=$CASK_VERSION sha256=$SHA"
 
-cat > "$TMPDIR/tap/Casks/switchboard.rb" <<CASK
+WORK_DIR=$(mktemp -d)
+trap 'rm -rf "$WORK_DIR"' EXIT
+
+gh repo clone maferland/homebrew-tap "$WORK_DIR" -- --depth 1
+
+if [ -n "${GH_TOKEN:-}" ]; then
+    git -C "$WORK_DIR" remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/maferland/homebrew-tap.git"
+fi
+
+cat > "$WORK_DIR/Casks/switchboard.rb" << CASK
 cask "switchboard" do
-  version "${VERSION#v}"
-  sha256 "${SHA256}"
+  version "$CASK_VERSION"
+  sha256 "$SHA"
 
-  url "${URL}"
+  url "https://github.com/maferland/switchboard/releases/download/v#{version}/Switchboard-v#{version}-macos.dmg"
   name "Switchboard"
   desc "Auto-switch audio and video devices when you dock your Mac"
   homepage "https://github.com/maferland/switchboard"
 
   depends_on macos: ">= :sonoma"
 
-  binary "Switchboard", target: "switchboard"
-
-  postflight do
-    system_command "launchctl",
-                   args: ["load", "#{ENV["HOME"]}/Library/LaunchAgents/com.maferland.switchboard.plist"],
-                   sudo: false
+  livecheck do
+    url :url
+    strategy :github_latest
   end
+
+  app "Switchboard.app"
+
+  zap trash: "~/.config/switchboard"
 end
 CASK
 
-cd "$TMPDIR/tap"
-git add -A
-git commit -m "switchboard ${VERSION}"
+cd "$WORK_DIR"
+git add Casks/switchboard.rb
+git commit -m "Update switchboard to $VERSION"
 git push
+
+echo "Homebrew tap updated"

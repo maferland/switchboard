@@ -1,53 +1,42 @@
 import AppKit
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private var menuBarController: MenuBarController?
-    private var audioManager: AudioDeviceManager?
-    private var cameraManager: CameraManager?
-    private var clamshellDetector: ClamshellDetector?
-    private var configManager: ConfigManager?
+    let configManager = ConfigManager()
+    let audioManager = AudioDeviceManager()
+    let cameraManager = CameraManager()
+    let clamshellDetector = ClamshellDetector()
     private var eventMonitor: EventMonitor?
-    private let preferencesController = PreferencesWindowController()
-    private let firstLaunchController = FirstLaunchWindowController()
+
+    lazy var windowState: WindowState = {
+        WindowState(
+            configManager: configManager,
+            audioManager: audioManager,
+            cameraManager: cameraManager
+        )
+    }()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let configMgr = ConfigManager()
-        configManager = configMgr
+        NSApp.setActivationPolicy(.accessory)
 
-        let audioMgr = AudioDeviceManager()
-        audioManager = audioMgr
+        let deviceController = DeviceController(audioManager: audioManager)
 
-        let cameraMgr = CameraManager()
-        cameraManager = cameraMgr
-
-        let clamshell = ClamshellDetector()
-        clamshellDetector = clamshell
-
-        let menuBar = MenuBarController()
-        menuBar.onOpenPreferences = { [weak self] in
-            guard let self, let cm = self.configManager, let am = self.audioManager, let cam = self.cameraManager else { return }
-            self.preferencesController.show(configManager: cm, audioManager: am, cameraManager: cam)
+        let monitor = EventMonitor(
+            audioManager: audioManager,
+            cameraManager: cameraManager,
+            clamshellDetector: clamshellDetector,
+            configManager: configManager,
+            deviceController: deviceController
+        )
+        monitor.onSelectionChanged = { [weak self] selection, clamshellState in
+            self?.windowState.selection = selection
+            self?.windowState.clamshellState = clamshellState
         }
-        menuBarController = menuBar
+        eventMonitor = monitor
 
-        let ruleEngine = RuleEngine(config: configMgr.config)
-        let deviceController = DeviceController(audioManager: audioMgr)
-
-        eventMonitor = EventMonitor(
-            audioManager: audioMgr,
-            cameraManager: cameraMgr,
-            clamshellDetector: clamshell,
-            ruleEngine: ruleEngine,
-            deviceController: deviceController,
-            menuBarController: menuBar
-        )
-
-        // Show first launch wizard if needed
-        firstLaunchController.showIfNeeded(
-            configManager: configMgr,
-            audioManager: audioMgr,
-            cameraManager: cameraMgr
-        )
+        windowState.onSetOverride = { [weak monitor] category, name in
+            monitor?.setOverride(category: category, deviceName: name)
+        }
 
         print("[Switchboard] Started")
     }

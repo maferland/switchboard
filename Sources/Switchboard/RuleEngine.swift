@@ -4,129 +4,93 @@ struct RuleEngine {
     let config: SwitchboardConfig
 
     func evaluate(state: DeviceState) -> DeviceSelection {
-        let mic = selectMic(state: state)
-        let output = selectOutput(state: state)
-        let camera = selectCamera(state: state)
-        let reason = describeMode(state: state)
-
-        return DeviceSelection(
-            preferredMic: mic,
-            preferredOutput: output,
-            preferredCamera: camera,
-            reason: reason
+        DeviceSelection(
+            preferredMic: selectMic(state: state),
+            preferredOutput: selectOutput(state: state),
+            preferredCamera: selectCamera(state: state),
+            reason: state.clamshellState == .closed ? "Clamshell Mode" : "Laptop Mode"
         )
     }
 
     // MARK: - Mic Selection
 
     private func selectMic(state: DeviceState) -> AudioDevice? {
+        let inputs = state.audioDevices.filter(\.hasInput)
+
         // 1. Manual override
-        if let overrideName = state.overrides[.mic],
-           let device = state.audioDevices.first(where: { $0.name == overrideName && $0.hasInput }) {
+        if let name = state.overrides[.mic],
+           let device = inputs.first(where: { $0.name == name }) {
             return device
         }
 
-        let inputs = state.audioDevices.filter(\.hasInput)
-        let allowed = inputs.filter { !isMicBlocked($0) }
-
-        // 2. Clamshell + StreamCam → StreamCam mic
-        if state.clamshellState == .closed,
-           let streamCam = allowed.first(where: { isStreamCam($0) }) {
-            return streamCam
+        // 2. Priority list from config
+        let priorities = state.clamshellState == .closed ? config.clamshellMic : config.laptopMic
+        for name in priorities {
+            if let device = inputs.first(where: { $0.name == name }) {
+                return device
+            }
         }
 
-        // 3. Clamshell, no StreamCam → built-in mic
-        if state.clamshellState == .closed {
-            return allowed.first(where: \.isBuiltIn)
-        }
-
-        // 4. Laptop open → built-in mic
-        return allowed.first(where: \.isBuiltIn)
+        // 3. Fallback: built-in
+        return inputs.first(where: \.isBuiltIn)
     }
 
     // MARK: - Output Selection
 
     private func selectOutput(state: DeviceState) -> AudioDevice? {
+        let outputs = state.audioDevices.filter(\.hasOutput)
+
         // 1. Manual override
-        if let overrideName = state.overrides[.output],
-           let device = state.audioDevices.first(where: { $0.name == overrideName && $0.hasOutput }) {
+        if let name = state.overrides[.output],
+           let device = outputs.first(where: { $0.name == name }) {
             return device
         }
 
-        let outputs = state.audioDevices.filter(\.hasOutput)
+        // 2. Priority list from config
+        let priorities = state.clamshellState == .closed ? config.clamshellOutput : config.laptopOutput
+        for name in priorities {
+            if let device = outputs.first(where: { $0.name == name }) {
+                return device
+            }
+        }
 
-        // Priority: headphones (BT/wired/USB) > external speaker > nothing
-        // Block laptop speakers unless allowed
-        let headphones = outputs.first(where: { $0.isBluetooth || ($0.isUSB && !isStreamCam($0)) })
-        if let headphones { return headphones }
-
-        let external = outputs.first(where: { $0.isHDMI || ($0.isUSB && !$0.hasInput) })
-        if let external { return external }
-
-        // Laptop speakers — only if explicitly allowed
-        if config.allowLaptopSpeakers {
+        // 3. Fallback: BT/USB > HDMI > built-in (only if no external)
+        if let btOrUsb = outputs.first(where: { $0.isBluetooth || $0.isUSB }) {
+            return btOrUsb
+        }
+        if let hdmi = outputs.first(where: \.isHDMI) {
+            return hdmi
+        }
+        let hasExternal = outputs.contains { !$0.isBuiltIn }
+        if !hasExternal {
             return outputs.first(where: \.isBuiltIn)
         }
-
-        // Last resort: allow built-in if it's the only option
-        if outputs.allSatisfy(\.isBuiltIn) {
-            return outputs.first(where: { $0.hasOutput && $0.isBuiltIn })
-        }
-
-        return outputs.first(where: { !isOutputBlocked($0) })
+        return outputs.first
     }
 
     // MARK: - Camera Selection
 
     private func selectCamera(state: DeviceState) -> VideoDevice? {
+        let cameras = state.videoDevices
+
         // 1. Manual override
-        if let overrideName = state.overrides[.camera],
-           let device = state.videoDevices.first(where: { $0.name == overrideName }) {
+        if let name = state.overrides[.camera],
+           let device = cameras.first(where: { $0.name == name }) {
             return device
         }
 
-        // 2. Clamshell + StreamCam → StreamCam
-        if state.clamshellState == .closed,
-           let streamCam = state.videoDevices.first(where: {
-               $0.name.localizedCaseInsensitiveContains(config.streamCamKeyword)
-           }) {
-            return streamCam
+        // 2. Priority list from config
+        let priorities = state.clamshellState == .closed ? config.clamshellCamera : config.laptopCamera
+        for name in priorities {
+            if let device = cameras.first(where: { $0.name == name }) {
+                return device
+            }
         }
 
-        // 3. Clamshell, no StreamCam → first external
-        if state.clamshellState == .closed,
-           let external = state.videoDevices.first(where: { !$0.isBuiltIn }) {
-            return external
+        // 3. Fallback
+        if state.clamshellState == .closed {
+            return cameras.first(where: { !$0.isBuiltIn }) ?? cameras.first(where: \.isBuiltIn)
         }
-
-        // 4. Laptop open → built-in
-        return state.videoDevices.first(where: \.isBuiltIn)
-    }
-
-    // MARK: - Filters
-
-    private func isMicBlocked(_ device: AudioDevice) -> Bool {
-        config.blockedMicKeywords.contains { keyword in
-            device.name.localizedCaseInsensitiveContains(keyword)
-        }
-    }
-
-    private func isOutputBlocked(_ device: AudioDevice) -> Bool {
-        config.blockedOutputKeywords.contains { keyword in
-            device.name.localizedCaseInsensitiveContains(keyword)
-        }
-    }
-
-    private func isStreamCam(_ device: AudioDevice) -> Bool {
-        device.name.localizedCaseInsensitiveContains(config.streamCamKeyword)
-    }
-
-    // MARK: - Mode Description
-
-    private func describeMode(state: DeviceState) -> String {
-        switch state.clamshellState {
-        case .closed: "Clamshell Mode"
-        case .open: "Laptop Mode"
-        }
+        return cameras.first(where: \.isBuiltIn)
     }
 }

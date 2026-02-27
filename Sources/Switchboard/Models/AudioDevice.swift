@@ -10,6 +10,18 @@ enum AudioDeviceTransport: String, Codable {
     case virtual
     case unknown
 
+    var displayName: String {
+        switch self {
+        case .builtIn: "Built-in"
+        case .usb: "USB"
+        case .bluetooth, .bluetoothLE: "Bluetooth"
+        case .hdmi: "HDMI"
+        case .aggregate: "Aggregate"
+        case .virtual: "Virtual"
+        case .unknown: "Unknown"
+        }
+    }
+
     init(transportType: UInt32) {
         switch transportType {
         case kAudioDeviceTransportTypeBuiltIn: self = .builtIn

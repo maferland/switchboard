@@ -1,13 +1,13 @@
 # Switchboard
 
-macOS menu bar daemon — auto-switches audio/video devices based on clamshell mode.
+macOS menu bar app — auto-switches audio/video devices based on clamshell mode.
 
 ## Build & Run
 
 ```sh
-make build        # debug build
-make app          # release build (runs tests first)
-swift run Switchboard  # run directly
+make build        # release build
+make app          # release build + package .app + DMG (runs tests first)
+swift run Switchboard  # run directly (debug)
 ```
 
 ## Test
@@ -19,12 +19,12 @@ make test         # swift test
 ## Install
 
 ```sh
-make install      # copies binary + LaunchAgent, loads it
+make install      # builds .app, copies to /Applications
 ```
 
 ## Architecture
 
-- **Sources/Switchboard/** — Main menu bar app (NSApplication, CoreAudio, IOKit)
+- **Sources/Switchboard/** — SwiftUI App + MenuBarExtra, CoreAudio, IOKit
 - **Sources/SwitchboardCamera/** — CMIOExtension virtual camera (needs Xcode for .appex)
 - **Tests/SwitchboardTests/** — Unit tests (RuleEngine, ClamshellDetector, ConfigManager)
 
@@ -32,5 +32,8 @@ make install      # copies binary + LaunchAgent, loads it
 
 - Combine publishers for device/state changes
 - Pure RuleEngine: `evaluate(state:) -> DeviceSelection`
+- Priority-list config: `[String]` arrays per mode per category, first available wins
 - Config at `~/.config/switchboard/config.json`
-- No SwiftUI App lifecycle — NSApplication + NSStatusItem for menu bar
+- SwiftUI App + MenuBarExtra(.window) for menu bar
+- SMAppService for Start at Login
+- After code changes, always reboot: `pkill -f '.build/debug/Switchboard'; sleep 0.5; swift run Switchboard &`

@@ -5,3 +5,6 @@
 *.xcworkspace
 DerivedData/
 .claude/
+*.dmg
+*.app
+*.zip

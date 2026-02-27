@@ -1,30 +1,33 @@
-VERSION := $(shell git describe --tags 2>/dev/null || echo "v0.0.0")
-BINARY := Switchboard
-BUILD_DIR := .build/release
-INSTALL_DIR := /usr/local/bin
-LAUNCH_AGENT_DIR := $(HOME)/Library/LaunchAgents
-PLIST := com.maferland.switchboard.plist
+.PHONY: build test release install clean app update-homebrew-tap
 
-.PHONY: build test app install clean release
+VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+NEXT_VERSION ?= $(VERSION)
 
 build:
-	swift build
+	swift build -c release
 
 test:
 	swift test
 
 app: test
-	swift build -c release
+	./scripts/package_app.sh $(NEXT_VERSION)
 
 install: app
-	cp $(BUILD_DIR)/$(BINARY) $(INSTALL_DIR)/switchboard
-	cp LaunchAgent/$(PLIST) $(LAUNCH_AGENT_DIR)/$(PLIST)
-	launchctl load $(LAUNCH_AGENT_DIR)/$(PLIST)
+	cp -R Switchboard.app /Applications/
+	@echo "Installed Switchboard.app to /Applications"
 
 clean:
-	swift package clean
-	rm -rf .build
+	rm -rf .build *.dmg Switchboard.app
 
-release: test
-	swift build -c release
-	@echo "Built $(BINARY) $(VERSION)"
+update-homebrew-tap:
+	./scripts/update_homebrew_tap.sh $(NEXT_VERSION) Switchboard-$(NEXT_VERSION)-macos.dmg
+
+release: app
+	@if [ "$(VERSION)" = "$(NEXT_VERSION)" ]; then \
+		echo "Error: specify NEXT_VERSION=vX.Y.Z"; exit 1; \
+	fi
+	gh release create $(NEXT_VERSION) Switchboard-$(NEXT_VERSION)-macos.dmg \
+		--title "Switchboard $(NEXT_VERSION)" \
+		--generate-notes
+	$(MAKE) update-homebrew-tap
+	@rm Switchboard-$(NEXT_VERSION)-macos.dmg

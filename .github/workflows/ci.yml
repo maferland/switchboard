@@ -7,20 +7,15 @@ on:
     branches: [main]
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
+  test:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
-
       - name: Build
         run: swift build
-
       - name: Test
         run: swift test
-
-      - name: Build Release
-        run: swift build -c release

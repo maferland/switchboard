@@ -16,6 +16,7 @@ let package = Package(
                 .linkedFramework("AVFoundation"),
                 .linkedFramework("SystemExtensions"),
                 .linkedFramework("CoreMediaIO"),
+                .linkedFramework("ServiceManagement"),
             ]
         ),
         .target(

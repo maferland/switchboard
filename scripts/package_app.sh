@@ -1,0 +1,127 @@
+#!/bin/bash
+set -euo pipefail
+
+VERSION="${1:-v0.0.0}"
+BUILD_DIR=".build/release"
+APP_NAME="Switchboard"
+APP_BUNDLE="${APP_NAME}.app"
+DMG_NAME="${APP_NAME}-${VERSION}-macos.dmg"
+
+BUNDLE_ID="com.maferland.switchboard"
+EXECUTABLE="${BUILD_DIR}/${APP_NAME}"
+
+echo "Packaging ${APP_NAME} ${VERSION}..."
+
+swift build -c release
+
+rm -rf "${APP_BUNDLE}"
+mkdir -p "${APP_BUNDLE}/Contents/MacOS"
+mkdir -p "${APP_BUNDLE}/Contents/Resources"
+
+cp "${EXECUTABLE}" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
+
+for bundle in "${BUILD_DIR}"/*.bundle; do
+    [ -d "$bundle" ] && cp -R "$bundle" "${APP_BUNDLE}/Contents/Resources/"
+done
+
+cat > "${APP_BUNDLE}/Contents/Info.plist" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleExecutable</key>
+    <string>${APP_NAME}</string>
+    <key>CFBundleIdentifier</key>
+    <string>${BUNDLE_ID}</string>
+    <key>CFBundleName</key>
+    <string>${APP_NAME}</string>
+    <key>CFBundleDisplayName</key>
+    <string>${APP_NAME}</string>
+    <key>CFBundleVersion</key>
+    <string>${VERSION}</string>
+    <key>CFBundleShortVersionString</key>
+    <string>${VERSION}</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Switchboard monitors audio devices to auto-switch defaults.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Switchboard detects cameras to auto-switch defaults.</string>
+</dict>
+</plist>
+EOF
+
+if command -v sips &> /dev/null && [ -f "assets/icon.png" ]; then
+    ICONSET_DIR="/tmp/${APP_NAME}.iconset"
+    rm -rf "${ICONSET_DIR}"
+    mkdir -p "${ICONSET_DIR}"
+
+    sips -z 16 16     assets/icon.png --out "${ICONSET_DIR}/icon_16x16.png" 2>/dev/null
+    sips -z 32 32     assets/icon.png --out "${ICONSET_DIR}/icon_16x16@2x.png" 2>/dev/null
+    sips -z 32 32     assets/icon.png --out "${ICONSET_DIR}/icon_32x32.png" 2>/dev/null
+    sips -z 64 64     assets/icon.png --out "${ICONSET_DIR}/icon_32x32@2x.png" 2>/dev/null
+    sips -z 128 128   assets/icon.png --out "${ICONSET_DIR}/icon_128x128.png" 2>/dev/null
+    sips -z 256 256   assets/icon.png --out "${ICONSET_DIR}/icon_128x128@2x.png" 2>/dev/null
+    sips -z 256 256   assets/icon.png --out "${ICONSET_DIR}/icon_256x256.png" 2>/dev/null
+    sips -z 512 512   assets/icon.png --out "${ICONSET_DIR}/icon_256x256@2x.png" 2>/dev/null
+    sips -z 512 512   assets/icon.png --out "${ICONSET_DIR}/icon_512x512.png" 2>/dev/null
+    sips -z 1024 1024 assets/icon.png --out "${ICONSET_DIR}/icon_512x512@2x.png" 2>/dev/null
+
+    iconutil -c icns "${ICONSET_DIR}" -o "${APP_BUNDLE}/Contents/Resources/AppIcon.icns" 2>/dev/null || true
+    rm -rf "${ICONSET_DIR}"
+fi
+
+echo "Created ${APP_BUNDLE}"
+
+if [ -n "${SIGN_IDENTITY:-}" ]; then
+    echo "Signing app bundle..."
+    CODESIGN_ARGS=(
+        --sign "${SIGN_IDENTITY}"
+        --options runtime
+        --timestamp
+        --deep
+        --force
+    )
+    if [ -n "${ENTITLEMENTS_FILE:-}" ]; then
+        CODESIGN_ARGS+=(--entitlements "${ENTITLEMENTS_FILE}")
+    fi
+    codesign "${CODESIGN_ARGS[@]}" "${APP_BUNDLE}"
+    echo "Signed ${APP_BUNDLE}"
+fi
+
+echo "Creating DMG..."
+rm -rf /tmp/Switchboard-dmg
+mkdir -p /tmp/Switchboard-dmg
+cp -R "${APP_BUNDLE}" /tmp/Switchboard-dmg/
+ln -s /Applications /tmp/Switchboard-dmg/Applications
+
+hdiutil create -volname "Switchboard ${VERSION}" \
+    -srcfolder /tmp/Switchboard-dmg \
+    -ov -format UDZO \
+    "${DMG_NAME}"
+
+rm -rf /tmp/Switchboard-dmg
+
+echo "Created ${DMG_NAME}"
+
+if [ -n "${APPLE_ID:-}" ] && [ -n "${APPLE_TEAM_ID:-}" ] && [ -n "${NOTARIZE_PASSWORD:-}" ]; then
+    echo "Submitting for notarization..."
+    xcrun notarytool submit "${DMG_NAME}" \
+        --apple-id "${APPLE_ID}" \
+        --team-id "${APPLE_TEAM_ID}" \
+        --password "${NOTARIZE_PASSWORD}" \
+        --wait
+
+    echo "Stapling notarization ticket..."
+    xcrun stapler staple "${DMG_NAME}"
+
+    echo "Notarization complete"
+fi

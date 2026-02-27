@@ -5,40 +5,59 @@ on:
     tags: ["v*"]
 
 jobs:
-  release:
+  build-and-release:
     runs-on: macos-14
     permissions:
       contents: write
+    env:
+      SIGN_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Release
-        run: swift build -c release
-
-      - name: Test
-        run: swift test
-
-      - name: Package
-        run: |
-          VERSION="${GITHUB_REF_NAME}"
-          mkdir -p dist
-          cp .build/release/Switchboard dist/
-          cd dist && zip "Switchboard-${VERSION}-macos-arm64.zip" Switchboard
-
-      - name: Create GitHub Release
+      - name: Import signing certificate
+        if: env.SIGN_CERTIFICATE != ''
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SIGN_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
         run: |
-          VERSION="${GITHUB_REF_NAME}"
-          gh release create "$VERSION" \
-            --title "$VERSION" \
-            --generate-notes \
-            dist/Switchboard-${VERSION}-macos-arm64.zip
+          echo "$SIGN_CERTIFICATE" | base64 --decode > /tmp/certificate.p12
+          KEYCHAIN_PATH=/tmp/build.keychain
+          security create-keychain -p "" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "" "$KEYCHAIN_PATH"
+          security import /tmp/certificate.p12 -k "$KEYCHAIN_PATH" -P "$SIGN_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
 
-      - name: Update Homebrew Tap
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | head -1 | grep -o '"[^"]*"' | tr -d '"')
+          echo "SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+          echo "ENTITLEMENTS_FILE=Switchboard.entitlements" >> "$GITHUB_ENV"
+
+      - name: Build, sign, notarize
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NOTARIZE_PASSWORD: ${{ secrets.NOTARIZE_PASSWORD }}
+        run: ./scripts/package_app.sh "$GITHUB_REF_NAME"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$GITHUB_REF_NAME"
+          DMG="Switchboard-${VERSION}-macos.dmg"
+          if gh release view "$VERSION" &>/dev/null; then
+            echo "Release $VERSION already exists, skipping"
+          else
+            gh release create "$VERSION" "$DMG" \
+              --title "Switchboard ${VERSION}" \
+              --generate-notes
+          fi
+
+      - name: Update homebrew tap
         env:
           GH_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
         run: |
-          if [ -f scripts/update_homebrew_tap.sh ]; then
-            ./scripts/update_homebrew_tap.sh "$GITHUB_REF_NAME" "dist/Switchboard-${GITHUB_REF_NAME}-macos-arm64.zip"
-          fi
+          VERSION="$GITHUB_REF_NAME"
+          DMG="Switchboard-${VERSION}-macos.dmg"
+          ./scripts/update_homebrew_tap.sh "$VERSION" "$DMG"

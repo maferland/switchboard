@@ -1,8 +1,10 @@
 import Foundation
+import Combine
 
 final class ConfigManager {
     private(set) var config: SwitchboardConfig
     private let configURL: URL
+    let configChanged = PassthroughSubject<SwitchboardConfig, Never>()
 
     static let defaultDirectory: URL = {
         let home = FileManager.default.homeDirectoryForCurrentUser
@@ -50,10 +52,12 @@ final class ConfigManager {
     func update(_ transform: (inout SwitchboardConfig) -> Void) {
         transform(&config)
         save()
+        configChanged.send(config)
     }
 
     func reset() {
         config = SwitchboardConfig()
         save()
+        configChanged.send(config)
     }
 }
