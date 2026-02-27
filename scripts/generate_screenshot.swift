@@ -3,6 +3,21 @@
 import AppKit
 import SwiftUI
 
+// MARK: - Version from git
+
+let version: String = {
+    let pipe = Pipe()
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+    process.arguments = ["describe", "--tags", "--abbrev=0"]
+    process.standardOutput = pipe
+    process.standardError = FileHandle.nullDevice
+    try? process.run()
+    process.waitUntilExit()
+    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+    return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "v1.0.0"
+}()
+
 // MARK: - Mock data
 
 struct MockDevice {
@@ -78,6 +93,8 @@ struct MockSection<Content: View>: View {
 }
 
 struct MockPopover: View {
+    let version: String
+
     var body: some View {
         VStack(spacing: 0) {
             // Top bar
@@ -96,7 +113,7 @@ struct MockPopover: View {
 
                 Spacer()
 
-                Text("v1.0.0")
+                Text(version)
                     .font(.system(size: 11))
                     .foregroundStyle(.tertiary)
 
@@ -151,23 +168,28 @@ struct MockPopover: View {
             .padding(.vertical, 8)
         }
         .frame(width: 320)
-        .background(.background)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.background)
+                .shadow(color: .black.opacity(0.3), radius: 20, y: 8)
+        )
     }
 }
 
 // MARK: - Capture
 
-let scale: CGFloat = 6
-let view = MockPopover()
-let hosting = NSHostingView(rootView: view)
+let scale: CGFloat = 4
+let padding: CGFloat = 32  // space for shadow
+let popover = MockPopover(version: version)
+let wrapper = popover.padding(padding)
 
-// Size to fit content
-hosting.frame = NSRect(x: 0, y: 0, width: 320, height: 600)
+let hosting = NSHostingView(rootView: wrapper.environment(\.colorScheme, .dark))
+hosting.frame = NSRect(x: 0, y: 0, width: 320 + padding * 2, height: 800)
 hosting.layoutSubtreeIfNeeded()
 let fittingSize = hosting.fittingSize
 hosting.frame = NSRect(origin: .zero, size: fittingSize)
 
-// Render at 3x
 let pixelWidth = Int(fittingSize.width * scale)
 let pixelHeight = Int(fittingSize.height * scale)
 
@@ -190,28 +212,8 @@ guard let bitmap = NSBitmapImageRep(
 bitmap.size = fittingSize
 
 NSGraphicsContext.saveGraphicsState()
-let context = NSGraphicsContext(bitmapImageRep: bitmap)!
-NSGraphicsContext.current = context
+NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
 
-// Add rounded corners + shadow
-let ctx = context.cgContext
-let cornerRadius: CGFloat = 12
-let rect = CGRect(origin: .zero, size: fittingSize)
-let insetRect = rect.insetBy(dx: 8, dy: 8)
-let path = CGPath(roundedRect: insetRect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
-
-// Shadow
-ctx.setShadow(offset: CGSize(width: 0, height: -2), blur: 8, color: CGColor(gray: 0, alpha: 0.25))
-ctx.setFillColor(CGColor.white)
-ctx.addPath(path)
-ctx.fillPath()
-ctx.setShadow(offset: .zero, blur: 0)
-
-// Clip to rounded rect and render
-ctx.addPath(path)
-ctx.clip()
-
-// Render the SwiftUI view
 hosting.cacheDisplay(in: NSRect(origin: .zero, size: fittingSize), to: bitmap)
 
 NSGraphicsContext.restoreGraphicsState()
@@ -222,7 +224,6 @@ guard let pngData = bitmap.representation(using: .png, properties: [:]) else {
 }
 
 let outputPath = "assets/popover.png"
-let url = URL(fileURLWithPath: outputPath)
-try! pngData.write(to: url)
+try! pngData.write(to: URL(fileURLWithPath: outputPath))
 
-print("Screenshot saved to \(outputPath) (\(pixelWidth)x\(pixelHeight))")
+print("Screenshot saved to \(outputPath) (\(pixelWidth)x\(pixelHeight)) — \(version)")
