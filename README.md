@@ -1,7 +1,7 @@
 <div align="center">
 <h1>🎛️ Switchboard</h1>
 
-<img src="assets/icon.png" width="128" height="128" alt="Switchboard Icon">
+<img src="assets/logo.png" width="128" height="128" alt="Switchboard Logo">
 
 <p>Auto-switch audio and video devices when you dock your Mac</p>
 </div>

@@ -59,21 +59,21 @@ cat > "${APP_BUNDLE}/Contents/Info.plist" << EOF
 </plist>
 EOF
 
-if command -v sips &> /dev/null && [ -f "assets/icon.png" ]; then
+if command -v sips &> /dev/null && [ -f "assets/logo.png" ]; then
     ICONSET_DIR="/tmp/${APP_NAME}.iconset"
     rm -rf "${ICONSET_DIR}"
     mkdir -p "${ICONSET_DIR}"
 
-    sips -z 16 16     assets/icon.png --out "${ICONSET_DIR}/icon_16x16.png" 2>/dev/null
-    sips -z 32 32     assets/icon.png --out "${ICONSET_DIR}/icon_16x16@2x.png" 2>/dev/null
-    sips -z 32 32     assets/icon.png --out "${ICONSET_DIR}/icon_32x32.png" 2>/dev/null
-    sips -z 64 64     assets/icon.png --out "${ICONSET_DIR}/icon_32x32@2x.png" 2>/dev/null
-    sips -z 128 128   assets/icon.png --out "${ICONSET_DIR}/icon_128x128.png" 2>/dev/null
-    sips -z 256 256   assets/icon.png --out "${ICONSET_DIR}/icon_128x128@2x.png" 2>/dev/null
-    sips -z 256 256   assets/icon.png --out "${ICONSET_DIR}/icon_256x256.png" 2>/dev/null
-    sips -z 512 512   assets/icon.png --out "${ICONSET_DIR}/icon_256x256@2x.png" 2>/dev/null
-    sips -z 512 512   assets/icon.png --out "${ICONSET_DIR}/icon_512x512.png" 2>/dev/null
-    sips -z 1024 1024 assets/icon.png --out "${ICONSET_DIR}/icon_512x512@2x.png" 2>/dev/null
+    sips -z 16 16     assets/logo.png --out "${ICONSET_DIR}/icon_16x16.png" 2>/dev/null
+    sips -z 32 32     assets/logo.png --out "${ICONSET_DIR}/icon_16x16@2x.png" 2>/dev/null
+    sips -z 32 32     assets/logo.png --out "${ICONSET_DIR}/icon_32x32.png" 2>/dev/null
+    sips -z 64 64     assets/logo.png --out "${ICONSET_DIR}/icon_32x32@2x.png" 2>/dev/null
+    sips -z 128 128   assets/logo.png --out "${ICONSET_DIR}/icon_128x128.png" 2>/dev/null
+    sips -z 256 256   assets/logo.png --out "${ICONSET_DIR}/icon_128x128@2x.png" 2>/dev/null
+    sips -z 256 256   assets/logo.png --out "${ICONSET_DIR}/icon_256x256.png" 2>/dev/null
+    sips -z 512 512   assets/logo.png --out "${ICONSET_DIR}/icon_256x256@2x.png" 2>/dev/null
+    sips -z 512 512   assets/logo.png --out "${ICONSET_DIR}/icon_512x512.png" 2>/dev/null
+    sips -z 1024 1024 assets/logo.png --out "${ICONSET_DIR}/icon_512x512@2x.png" 2>/dev/null
 
     iconutil -c icns "${ICONSET_DIR}" -o "${APP_BUNDLE}/Contents/Resources/AppIcon.icns" 2>/dev/null || true
     rm -rf "${ICONSET_DIR}"
